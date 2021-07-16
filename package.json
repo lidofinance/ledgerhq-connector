@@ -1,16 +1,15 @@
 {
-  "name": "web3-ledger-provider",
-  "version": "1.1.4",
+  "name": "web3-ledgerhq-connector",
+  "version": "0.0.1",
   "license": "MIT",
-  "main": "dist/index.js",
-  "module": "dist/web3-ledger-provider.esm.js",
-  "typings": "dist/index.d.ts",
+  "typings": "dist/cjs/index.d.ts",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
   "files": [
     "dist"
   ],
   "scripts": {
-    "start": "tsdx watch",
-    "build": "tsdx build",
+    "build": "tsdx build && rm dist/index.js",
     "lint": "tsdx lint src"
   },
   "devDependencies": {
@@ -28,6 +27,8 @@
     "@ledgerhq/hw-app-eth": "6",
     "@ledgerhq/hw-transport": "6",
     "@ledgerhq/hw-transport-webhid": "6",
+    "@web3-react/abstract-connector": "6",
+    "@web3-react/types": "6",
     "tiny-invariant": "1"
   },
   "sideEffects": false
