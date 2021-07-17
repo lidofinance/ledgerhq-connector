@@ -1,6 +1,6 @@
 {
   "name": "web3-ledgerhq-connector",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "license": "MIT",
   "typings": "dist/cjs/index.d.ts",
   "main": "dist/cjs/index.js",
