@@ -1,6 +1,6 @@
 import invariant from 'tiny-invariant';
 import { AbstractConnector } from '@web3-react/abstract-connector';
-import { isHIDSupported } from './helpers';
+import { checkError, isHIDSupported } from './helpers';
 
 import type { LedgerHQProvider } from './provider';
 import type { ConnectorUpdate } from '@web3-react/types';
@@ -40,14 +40,18 @@ export class LedgerHQConnector extends AbstractConnector {
   }
 
   public async activate(): Promise<ConnectorUpdate> {
-    if (!this.provider) {
-      this.provider = await this.getProviderInstance();
+    try {
+      if (!this.provider) {
+        this.provider = await this.getProviderInstance();
+      }
+
+      this.provider.on('disconnect', this.handleDisconnect);
+      const account = await this.provider.enable();
+
+      return { provider: this.provider, account };
+    } catch (error) {
+      return checkError(error);
     }
-
-    this.provider.on('disconnect', this.handleDisconnect);
-    const account = await this.provider.enable();
-
-    return { provider: this.provider, account };
   }
 
   public async getProvider(): Promise<LedgerHQProvider | undefined> {

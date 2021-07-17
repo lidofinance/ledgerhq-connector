@@ -7,6 +7,7 @@ import { UnsignedTransaction, serialize } from '@ethersproject/transactions';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { Bytes, hexlify, joinSignature } from '@ethersproject/bytes';
 import { LedgerHQProvider } from './provider';
+import { checkError } from './helpers';
 
 const defaultPath = "m/44'/60'/0'/0/0";
 
@@ -32,6 +33,8 @@ export class LedgerHQSigner extends Signer {
       await eth.getAppConfiguration();
 
       return await callback(eth);
+    } catch (error) {
+      return checkError(error);
     } finally {
       await transport.close();
     }

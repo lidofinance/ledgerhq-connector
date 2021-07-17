@@ -3,6 +3,7 @@ import { JsonRpcBatchProvider, Network } from '@ethersproject/providers';
 import { TransactionRequest } from '@ethersproject/providers';
 import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
 import { LedgerHQSigner } from './signer';
+import { checkError } from './helpers';
 
 import type TransportHID from '@ledgerhq/hw-transport-webhid';
 
@@ -25,34 +26,43 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
 
   async getTransport(): Promise<TransportHID> {
     invariant(this.transport, 'Transport is not defined');
-    const transport = (await this.transport?.create()) as TransportHID;
-    this.device = transport.device;
 
-    return transport;
+    try {
+      const transport = (await this.transport?.create()) as TransportHID;
+      this.device = transport.device;
+
+      return transport;
+    } catch (error) {
+      return checkError(error);
+    }
   }
 
   async enable(): Promise<string> {
-    const { default: TransportHID } = await import(
-      '@ledgerhq/hw-transport-webhid'
-    );
-    this.transport = TransportHID;
+    try {
+      const { default: TransportHID } = await import(
+        '@ledgerhq/hw-transport-webhid'
+      );
+      this.transport = TransportHID;
 
-    const { hid } = window.navigator;
+      const { hid } = window.navigator;
 
-    const onDisconnect = (event: HIDConnectionEvent) => {
-      if (this.device === event.device) {
-        hid.removeEventListener('disconnect', onDisconnect);
-        this.emit('disconnect');
+      const onDisconnect = (event: HIDConnectionEvent) => {
+        if (this.device === event.device) {
+          hid.removeEventListener('disconnect', onDisconnect);
+          this.emit('disconnect');
+        }
+      };
+
+      hid.addEventListener('disconnect', onDisconnect);
+
+      if (!this.signer) {
+        this.signer = this.getSigner();
       }
-    };
 
-    hid.addEventListener('disconnect', onDisconnect);
-
-    if (!this.signer) {
-      this.signer = this.getSigner();
+      return await this.getAddress();
+    } catch (error) {
+      return checkError(error);
     }
-
-    return await this.getAddress();
   }
 
   async getAddress(): Promise<string> {
