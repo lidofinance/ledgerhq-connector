@@ -6,33 +6,26 @@ import { resolveProperties } from '@ethersproject/properties';
 import { UnsignedTransaction, serialize } from '@ethersproject/transactions';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { Bytes, hexlify, joinSignature } from '@ethersproject/bytes';
-import { transports } from './transport';
 import { LedgerHQProvider } from './provider';
 
 const defaultPath = "m/44'/60'/0'/0/0";
 
 export class LedgerHQSigner extends Signer {
-  readonly type: keyof typeof transports;
   readonly path: string;
   readonly provider: LedgerHQProvider;
 
   _index = 0;
   _address = '';
 
-  constructor(
-    provider: LedgerHQProvider,
-    type: keyof typeof transports = 'default',
-    path: string = defaultPath,
-  ) {
+  constructor(provider: LedgerHQProvider, path: string = defaultPath) {
     super();
 
     this.path = path;
-    this.type = type;
     this.provider = provider;
   }
 
   async withEthApp<T extends unknown>(callback: (eth: Eth) => T): Promise<T> {
-    const transport = await transports[this.type].create();
+    const transport = await this.provider.getTransport();
 
     try {
       const eth = new Eth(transport);
@@ -97,7 +90,7 @@ export class LedgerHQSigner extends Signer {
   }
 
   connect(provider: LedgerHQProvider): JsonRpcSigner {
-    return new LedgerHQSigner(provider, this.type, this.path);
+    return new LedgerHQSigner(provider, this.path);
   }
 
   connectUnchecked(): JsonRpcSigner {

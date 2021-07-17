@@ -3,9 +3,7 @@
     [
       "@babel/preset-env",
       {
-        "targets": {
-          "esmodules": true
-        },
+        "targets": { "esmodules": true },
         "exclude": ["@babel/plugin-proposal-async-generator-functions"]
       }
     ]

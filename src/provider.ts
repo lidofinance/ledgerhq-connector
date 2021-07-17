@@ -1,14 +1,18 @@
+import invariant from 'tiny-invariant';
 import { JsonRpcProvider, Network } from '@ethersproject/providers';
 import { TransactionRequest } from '@ethersproject/providers';
 import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
 import { LedgerHQSigner } from './signer';
 
+import type TransportHID from '@ledgerhq/hw-transport-webhid';
 export class LedgerHQProvider extends JsonRpcProvider {
   constructor(...args: ConstructorParameters<typeof JsonRpcProvider>) {
     super(...args);
   }
 
   public signer?: LedgerHQSigner;
+  public device?: HIDDevice;
+  public transport?: typeof TransportHID;
 
   getSigner(): LedgerHQSigner {
     return new LedgerHQSigner(this);
@@ -22,11 +26,38 @@ export class LedgerHQProvider extends JsonRpcProvider {
     return this._network;
   }
 
-  async getAddress(): Promise<string> {
+  async getTransport(): Promise<TransportHID> {
+    invariant(this.transport, 'Transport is not defined');
+    const transport = await this.transport?.create() as TransportHID;
+    this.device = transport.device
+
+    return transport;
+  }
+
+  async enable(): Promise<string> {
+    const { default: TransportHID } = await import('@ledgerhq/hw-transport-webhid');
+    this.transport = TransportHID;
+
+    const { hid } = window.navigator;
+
+    const onDisconnect = (event: HIDConnectionEvent) => {
+      if (this.device === event.device) {
+        hid.removeEventListener("disconnect", onDisconnect);
+        this.emit('disconnect');
+      }
+    };
+
+    hid.addEventListener("disconnect", onDisconnect);
+
     if (!this.signer) {
       this.signer = this.getSigner();
     }
 
+    return await this.getAddress();
+  }
+
+  async getAddress(): Promise<string> {
+    invariant(this.signer, 'Signer is not defined');
     return await this.signer.getAddress();
   }
 
@@ -37,8 +68,9 @@ export class LedgerHQProvider extends JsonRpcProvider {
     method: string;
     params: Array<unknown>;
   }): Promise<unknown> {
+    invariant(this.signer, 'Signer is not defined');
+
     if (method === 'eth_sendTransaction') {
-      const signer = this.getSigner();
       const unsignedTx = params[0] as TransactionRequest & {
         gas?: BigNumberish;
       };
@@ -56,8 +88,8 @@ export class LedgerHQProvider extends JsonRpcProvider {
         type: unsignedTx.type || 0,
       };
 
-      const populatedTx = await signer.populateTransaction(baseTx);
-      const signedTx = await signer.signTransaction(populatedTx);
+      const populatedTx = await this.signer.populateTransaction(baseTx);
+      const signedTx = await this.signer.signTransaction(populatedTx);
 
       return this.send('eth_sendRawTransaction', [signedTx]);
     }

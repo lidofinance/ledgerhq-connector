@@ -2,7 +2,7 @@ import invariant from 'tiny-invariant';
 import { AbstractConnector } from '@web3-react/abstract-connector';
 import { isHIDSupported } from './helpers';
 
-import type { LedgerHQProvider }  from './provider';
+import type { LedgerHQProvider } from './provider';
 import type { ConnectorUpdate } from '@web3-react/types';
 
 type LedgerHQConnectorArguments = {
@@ -21,30 +21,15 @@ export class LedgerHQConnector extends AbstractConnector {
     this.chainId = chainId;
     this.url = url;
 
-    this.handleNetworkChanged = this.handleNetworkChanged.bind(this);
-    this.handleChainChanged = this.handleChainChanged.bind(this);
-    this.handleAccountsChanged = this.handleAccountsChanged.bind(this);
-    this.handleClose = this.handleClose.bind(this);
+    this.handleDisconnect = this.handleDisconnect.bind(this);
   }
 
-  private handleNetworkChanged(networkId: string): void {
-    this.emitUpdate({ provider: this.provider, chainId: networkId });
-  }
-
-  private handleChainChanged(chainId: string): void {
-    this.emitUpdate({ chainId });
-  }
-
-  private handleAccountsChanged(accounts: string[]): void {
-    this.emitUpdate({ account: accounts.length === 0 ? null : accounts[0] });
-  }
-
-  private handleClose(): void {
+  private handleDisconnect(): void {
     this.emitDeactivate();
   }
 
   public isSupported(): boolean {
-    return isHIDSupported()
+    return isHIDSupported();
   }
 
   public async getProviderInstance(): Promise<LedgerHQProvider> {
@@ -56,15 +41,11 @@ export class LedgerHQConnector extends AbstractConnector {
 
   public async activate(): Promise<ConnectorUpdate> {
     if (!this.provider) {
-      this.provider = await this.getProviderInstance()
+      this.provider = await this.getProviderInstance();
     }
 
-    this.provider.on('networkChanged', this.handleNetworkChanged);
-    this.provider.on('chainChanged', this.handleChainChanged);
-    this.provider.on('accountsChanged', this.handleAccountsChanged);
-    this.provider.on('close', this.handleClose);
-
-    const account = await this.getAccount();
+    this.provider.on('disconnect', this.handleDisconnect);
+    const account = await this.provider.enable();
 
     return { provider: this.provider, account };
   }
@@ -79,18 +60,13 @@ export class LedgerHQConnector extends AbstractConnector {
 
   public async getAccount(): Promise<string> {
     invariant(this.provider, 'Provider is not defined');
-
     return this.provider.getAddress();
   }
 
   public deactivate(): void {
     invariant(this.provider, 'Provider is not defined');
-
-    this.provider.removeListener('networkChanged', this.handleNetworkChanged);
-    this.provider.removeListener('chainChanged', this.handleChainChanged);
-    this.provider.removeListener('accountsChanged', this.handleAccountsChanged);
-    this.provider.removeListener('close', this.handleClose);
+    this.provider.removeListener('disconnect', this.handleDisconnect);
   }
 }
 
-export default LedgerHQConnector
+export default LedgerHQConnector;
