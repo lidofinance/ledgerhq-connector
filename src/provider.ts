@@ -1,15 +1,12 @@
 import invariant from 'tiny-invariant';
-import { JsonRpcProvider, Network } from '@ethersproject/providers';
+import { JsonRpcBatchProvider, Network } from '@ethersproject/providers';
 import { TransactionRequest } from '@ethersproject/providers';
 import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
 import { LedgerHQSigner } from './signer';
 
 import type TransportHID from '@ledgerhq/hw-transport-webhid';
-export class LedgerHQProvider extends JsonRpcProvider {
-  constructor(...args: ConstructorParameters<typeof JsonRpcProvider>) {
-    super(...args);
-  }
 
+export class LedgerHQProvider extends JsonRpcBatchProvider {
   public signer?: LedgerHQSigner;
   public device?: HIDDevice;
   public transport?: typeof TransportHID;
@@ -28,26 +25,28 @@ export class LedgerHQProvider extends JsonRpcProvider {
 
   async getTransport(): Promise<TransportHID> {
     invariant(this.transport, 'Transport is not defined');
-    const transport = await this.transport?.create() as TransportHID;
-    this.device = transport.device
+    const transport = (await this.transport?.create()) as TransportHID;
+    this.device = transport.device;
 
     return transport;
   }
 
   async enable(): Promise<string> {
-    const { default: TransportHID } = await import('@ledgerhq/hw-transport-webhid');
+    const { default: TransportHID } = await import(
+      '@ledgerhq/hw-transport-webhid'
+    );
     this.transport = TransportHID;
 
     const { hid } = window.navigator;
 
     const onDisconnect = (event: HIDConnectionEvent) => {
       if (this.device === event.device) {
-        hid.removeEventListener("disconnect", onDisconnect);
+        hid.removeEventListener('disconnect', onDisconnect);
         this.emit('disconnect');
       }
     };
 
-    hid.addEventListener("disconnect", onDisconnect);
+    hid.addEventListener('disconnect', onDisconnect);
 
     if (!this.signer) {
       this.signer = this.getSigner();
@@ -94,7 +93,6 @@ export class LedgerHQProvider extends JsonRpcProvider {
       return this.send('eth_sendRawTransaction', [signedTx]);
     }
 
-    if (method === 'eth_chainId') return this._network.chainId;
     if (method === 'eth_accounts') return [await this.getAddress()];
 
     return this.send(method, params);

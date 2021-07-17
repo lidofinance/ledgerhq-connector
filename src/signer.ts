@@ -39,7 +39,7 @@ export class LedgerHQSigner extends Signer {
 
   async getAddress(): Promise<string> {
     if (!this._address) {
-      const account = await this.withEthApp(eth => eth.getAddress(this.path));
+      const account = await this.withEthApp((eth) => eth.getAddress(this.path));
 
       const address = this.provider.formatter.address(account.address);
       this._address = address;
@@ -54,7 +54,7 @@ export class LedgerHQSigner extends Signer {
     }
 
     const messageHex = hexlify(message).substring(2);
-    const sig = await this.withEthApp(eth =>
+    const sig = await this.withEthApp((eth) =>
       eth.signPersonalMessage(this.path, messageHex),
     );
 
@@ -78,7 +78,7 @@ export class LedgerHQSigner extends Signer {
     };
 
     const unsignedTx = serialize(baseTx).substring(2);
-    const sig = await this.withEthApp(eth =>
+    const sig = await this.withEthApp((eth) =>
       eth.signTransaction(this.path, unsignedTx),
     );
 
