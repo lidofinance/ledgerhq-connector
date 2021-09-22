@@ -89,6 +89,8 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
         data: unsignedTx.data,
         gasLimit: unsignedTx.gasLimit || unsignedTx.gas,
         gasPrice: unsignedTx.gasPrice,
+        maxFeePerGas: unsignedTx.maxFeePerGas,
+        maxPriorityFeePerGas: unsignedTx.maxPriorityFeePerGas,
         nonce: unsignedTx.nonce
           ? BigNumber.from(unsignedTx.nonce).toNumber()
           : undefined,
