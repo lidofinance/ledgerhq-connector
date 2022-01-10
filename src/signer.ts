@@ -1,7 +1,12 @@
 import Eth from '@ledgerhq/hw-app-eth';
+import ledgerService from '@ledgerhq/hw-app-eth/lib/services/ledger';
+import {
+  LoadConfig,
+  ResolutionConfig,
+} from '@ledgerhq/hw-app-eth/lib/services/types';
 import { JsonRpcSigner, TransactionRequest } from '@ethersproject/providers';
 import { BigNumber } from '@ethersproject/bignumber';
-import { Signer } from '@ethersproject/abstract-signer';
+import { Signer, TypedDataSigner } from '@ethersproject/abstract-signer';
 import { resolveProperties } from '@ethersproject/properties';
 import { UnsignedTransaction, serialize } from '@ethersproject/transactions';
 import { toUtf8Bytes } from '@ethersproject/strings';
@@ -11,7 +16,7 @@ import { checkError } from './helpers';
 
 const defaultPath = "m/44'/60'/0'/0/0";
 
-export class LedgerHQSigner extends Signer {
+export class LedgerHQSigner extends Signer implements TypedDataSigner {
   readonly path: string;
   readonly provider: LedgerHQProvider;
 
@@ -67,7 +72,11 @@ export class LedgerHQSigner extends Signer {
     return joinSignature(sig);
   }
 
-  async signTransaction(transaction: TransactionRequest): Promise<string> {
+  async signTransaction(
+    transaction: TransactionRequest,
+    loadConfig: LoadConfig = {},
+    resolutionConfig: ResolutionConfig = {},
+  ): Promise<string> {
     const tx = await resolveProperties(transaction);
 
     const baseTx: UnsignedTransaction = {
@@ -75,14 +84,23 @@ export class LedgerHQSigner extends Signer {
       data: tx.data,
       gasLimit: tx.gasLimit,
       gasPrice: tx.gasPrice,
-      nonce: tx.nonce ? BigNumber.from(tx.nonce).toNumber() : undefined,
+      maxFeePerGas: tx.maxFeePerGas,
+      maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
+      nonce: tx.nonce == null ? undefined : BigNumber.from(tx.nonce).toNumber(),
       to: tx.to,
       value: tx.value,
+      type: tx.type == null ? undefined : BigNumber.from(tx.type).toNumber(),
     };
 
     const unsignedTx = serialize(baseTx).substring(2);
+    const resolution = await ledgerService.resolveTransaction(
+      unsignedTx,
+      loadConfig,
+      resolutionConfig,
+    );
+
     const sig = await this.withEthApp((eth) =>
-      eth.signTransaction(this.path, unsignedTx),
+      eth.signTransaction(this.path, unsignedTx, resolution),
     );
 
     return serialize(baseTx, {
@@ -108,7 +126,11 @@ export class LedgerHQSigner extends Signer {
     throw new Error('method is not implemented');
   }
 
-  _signTypedData(): Promise<string> {
+  async _legacySignMessage(message: Bytes | string): Promise<string> {
+    throw new Error('method is not implemented');
+  }
+
+  async _signTypedData(): Promise<string> {
     throw new Error('method is not implemented');
   }
 }
