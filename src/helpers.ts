@@ -6,7 +6,7 @@ export const isHIDSupported = () => {
   }
 };
 
-export const checkError = (error: Error & { statusText?: string }): never => {
+export const checkError = (error: any): never => {
   if (error.statusText === 'INS_NOT_SUPPORTED') {
     error.message =
       'Device is not supported. Make sure the Ethereum app is open on the device.';
