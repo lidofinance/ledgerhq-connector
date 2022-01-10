@@ -12,7 +12,7 @@ import { UnsignedTransaction, serialize } from '@ethersproject/transactions';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { Bytes, hexlify, joinSignature } from '@ethersproject/bytes';
 import { LedgerHQProvider } from './provider';
-import { checkError } from './helpers';
+import { checkError, hasEIP1559 } from './helpers';
 
 const defaultPath = "m/44'/60'/0'/0/0";
 
@@ -84,13 +84,17 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
       data: tx.data,
       gasLimit: tx.gasLimit,
       gasPrice: tx.gasPrice,
-      maxFeePerGas: tx.maxFeePerGas,
-      maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
       nonce: tx.nonce == null ? undefined : BigNumber.from(tx.nonce).toNumber(),
       to: tx.to,
       value: tx.value,
       type: tx.type == null ? undefined : BigNumber.from(tx.type).toNumber(),
     };
+
+    if (hasEIP1559(tx)) {
+      baseTx.maxFeePerGas = tx.maxFeePerGas;
+      baseTx.maxPriorityFeePerGas = tx.maxPriorityFeePerGas;
+      baseTx.type = 2;
+    }
 
     const unsignedTx = serialize(baseTx).substring(2);
     const resolution = await ledgerService.resolveTransaction(

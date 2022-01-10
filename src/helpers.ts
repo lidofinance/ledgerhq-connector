@@ -1,9 +1,21 @@
+import { BigNumberish } from '@ethersproject/bignumber';
+
 export const isHIDSupported = () => {
   try {
     return 'hid' in window.navigator;
   } catch (error) {
     return false;
   }
+};
+
+export const hasEIP1559 = (tx: {
+  type?: number;
+  maxFeePerGas?: BigNumberish;
+  maxPriorityFeePerGas?: BigNumberish;
+}) => {
+  return (
+    tx.type === 2 || tx.maxFeePerGas != null || tx.maxPriorityFeePerGas != null
+  );
 };
 
 export const checkError = (error: any): never => {
