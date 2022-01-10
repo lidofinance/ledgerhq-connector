@@ -3,7 +3,7 @@ import { JsonRpcBatchProvider, Network } from '@ethersproject/providers';
 import { TransactionRequest } from '@ethersproject/providers';
 import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
 import { LedgerHQSigner } from './signer';
-import { checkError } from './helpers';
+import { checkError, hasEIP1559 } from './helpers';
 
 import type TransportHID from '@ledgerhq/hw-transport-webhid';
 
@@ -84,13 +84,11 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
         gas?: BigNumberish;
       };
 
-      const baseTx = {
+      const baseTx: TransactionRequest = {
         chainId: unsignedTx.chainId,
         data: unsignedTx.data,
         gasLimit: unsignedTx.gasLimit || unsignedTx.gas,
         gasPrice: unsignedTx.gasPrice,
-        maxFeePerGas: unsignedTx.maxFeePerGas,
-        maxPriorityFeePerGas: unsignedTx.maxPriorityFeePerGas,
         nonce: unsignedTx.nonce
           ? BigNumber.from(unsignedTx.nonce).toNumber()
           : undefined,
@@ -98,6 +96,12 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
         value: unsignedTx.value,
         type: unsignedTx.type || 0,
       };
+
+      if (hasEIP1559(unsignedTx)) {
+        baseTx.maxFeePerGas = unsignedTx.maxFeePerGas;
+        baseTx.maxPriorityFeePerGas = unsignedTx.maxPriorityFeePerGas;
+        baseTx.type = 2;
+      }
 
       const populatedTx = await this.signer.populateTransaction(baseTx);
       const signedTx = await this.signer.signTransaction(populatedTx);
