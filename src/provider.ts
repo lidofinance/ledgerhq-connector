@@ -103,8 +103,7 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
         baseTx.type = 2;
       }
 
-      const populatedTx = await this.signer.populateTransaction(baseTx);
-      const signedTx = await this.signer.signTransaction(populatedTx);
+      const signedTx = await this.signer.signTransaction(baseTx);
 
       return this.send('eth_sendRawTransaction', [signedTx]);
     }

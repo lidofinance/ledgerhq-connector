@@ -79,7 +79,7 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
   ): Promise<string> {
     const tx = await resolveProperties(transaction);
 
-    const baseTx: UnsignedTransaction = {
+    const baseTx: UnsignedTransaction & TransactionRequest = {
       chainId: tx.chainId,
       data: tx.data,
       gasLimit: tx.gasLimit,
@@ -95,6 +95,9 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
       baseTx.maxPriorityFeePerGas = tx.maxPriorityFeePerGas;
       baseTx.type = 2;
     }
+
+    const populatedTx = await this.populateTransaction(baseTx);
+    Object.assign(baseTx, populatedTx);
 
     const unsignedTx = serialize(baseTx).substring(2);
     const resolution = await ledgerService.resolveTransaction(
