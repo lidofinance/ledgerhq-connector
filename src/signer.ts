@@ -7,12 +7,12 @@ import {
 import { JsonRpcSigner, TransactionRequest } from '@ethersproject/providers';
 import { BigNumber } from '@ethersproject/bignumber';
 import { Signer, TypedDataSigner } from '@ethersproject/abstract-signer';
-import { resolveProperties } from '@ethersproject/properties';
 import { UnsignedTransaction, serialize } from '@ethersproject/transactions';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { Bytes, hexlify, joinSignature } from '@ethersproject/bytes';
 import { LedgerHQProvider } from './provider';
-import { checkError, hasEIP1559 } from './helpers';
+import { checkError, convertToUnsigned, toNumber } from './helpers';
+import { UnsignedTransactionStrict } from './types';
 
 const defaultPath = "m/44'/60'/0'/0/0";
 
@@ -72,45 +72,42 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
     return joinSignature(sig);
   }
 
+  async populateUnsigned(
+    transaction: UnsignedTransactionStrict,
+  ): Promise<UnsignedTransaction> {
+    const populated = await this.populateTransaction(transaction);
+    const nonce = toNumber(populated.nonce);
+
+    if (populated.type === 0) {
+      const { gasLimit, type, chainId, gasPrice, value, data, to } = populated;
+
+      // Allowed transaction keys for Legacy and EIP-155 Transactions
+      return { gasLimit, type, chainId, gasPrice, nonce, value, data, to };
+    }
+
+    return { ...populated, nonce };
+  }
+
   async signTransaction(
     transaction: TransactionRequest,
     loadConfig: LoadConfig = {},
     resolutionConfig: ResolutionConfig = {},
   ): Promise<string> {
-    const tx = await resolveProperties(transaction);
+    const unsignedTx = await convertToUnsigned(transaction);
+    const populatedTx = await this.populateUnsigned(unsignedTx);
 
-    const baseTx: UnsignedTransaction & TransactionRequest = {
-      chainId: tx.chainId,
-      data: tx.data,
-      gasLimit: tx.gasLimit,
-      gasPrice: tx.gasPrice,
-      nonce: tx.nonce == null ? undefined : BigNumber.from(tx.nonce).toNumber(),
-      to: tx.to,
-      value: tx.value,
-      type: tx.type == null ? undefined : BigNumber.from(tx.type).toNumber(),
-    };
-
-    if (hasEIP1559(tx)) {
-      baseTx.maxFeePerGas = tx.maxFeePerGas;
-      baseTx.maxPriorityFeePerGas = tx.maxPriorityFeePerGas;
-      baseTx.type = 2;
-    }
-
-    const populatedTx = await this.populateTransaction(baseTx);
-    Object.assign(baseTx, populatedTx);
-
-    const unsignedTx = serialize(baseTx).substring(2);
+    const serializedTx = serialize(populatedTx).substring(2);
     const resolution = await ledgerService.resolveTransaction(
-      unsignedTx,
+      serializedTx,
       loadConfig,
       resolutionConfig,
     );
 
     const sig = await this.withEthApp((eth) =>
-      eth.signTransaction(this.path, unsignedTx, resolution),
+      eth.signTransaction(this.path, serializedTx, resolution),
     );
 
-    return serialize(baseTx, {
+    return serialize(populatedTx, {
       v: BigNumber.from('0x' + sig.v).toNumber(),
       r: '0x' + sig.r,
       s: '0x' + sig.s,

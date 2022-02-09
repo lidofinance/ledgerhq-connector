@@ -1,11 +1,10 @@
 import invariant from 'tiny-invariant';
 import { JsonRpcBatchProvider, Network } from '@ethersproject/providers';
-import { TransactionRequest } from '@ethersproject/providers';
-import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
 import { LedgerHQSigner } from './signer';
-import { checkError, hasEIP1559 } from './helpers';
+import { checkError, convertToUnsigned } from './helpers';
 
 import type TransportHID from '@ledgerhq/hw-transport-webhid';
+import { TransactionRequestExtended } from './types';
 
 export class LedgerHQProvider extends JsonRpcBatchProvider {
   public signer?: LedgerHQSigner;
@@ -80,30 +79,9 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
     invariant(this.signer, 'Signer is not defined');
 
     if (method === 'eth_sendTransaction') {
-      const unsignedTx = params[0] as TransactionRequest & {
-        gas?: BigNumberish;
-      };
-
-      const baseTx: TransactionRequest = {
-        chainId: unsignedTx.chainId,
-        data: unsignedTx.data,
-        gasLimit: unsignedTx.gasLimit || unsignedTx.gas,
-        gasPrice: unsignedTx.gasPrice,
-        nonce: unsignedTx.nonce
-          ? BigNumber.from(unsignedTx.nonce).toNumber()
-          : undefined,
-        to: unsignedTx.to,
-        value: unsignedTx.value,
-        type: unsignedTx.type || 0,
-      };
-
-      if (hasEIP1559(unsignedTx)) {
-        baseTx.maxFeePerGas = unsignedTx.maxFeePerGas;
-        baseTx.maxPriorityFeePerGas = unsignedTx.maxPriorityFeePerGas;
-        baseTx.type = 2;
-      }
-
-      const signedTx = await this.signer.signTransaction(baseTx);
+      const sourceTx = params[0] as TransactionRequestExtended;
+      const unsignedTx = await convertToUnsigned(sourceTx);
+      const signedTx = await this.signer.signTransaction(unsignedTx);
 
       return this.send('eth_sendRawTransaction', [signedTx]);
     }
