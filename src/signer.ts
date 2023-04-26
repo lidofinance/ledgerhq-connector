@@ -4,12 +4,23 @@ import {
   LoadConfig,
   ResolutionConfig,
 } from '@ledgerhq/hw-app-eth/lib/services/types';
+import {
+  EIP712MessageTypes,
+  EIP712Message,
+} from '@ledgerhq/hw-app-eth/lib/modules/EIP712/EIP712.types';
 import { JsonRpcSigner, TransactionRequest } from '@ethersproject/providers';
 import { BigNumber } from '@ethersproject/bignumber';
-import { Signer, TypedDataSigner } from '@ethersproject/abstract-signer';
+import {
+  Signer,
+  TypedDataDomain,
+  TypedDataField,
+  TypedDataSigner,
+} from '@ethersproject/abstract-signer';
 import { UnsignedTransaction, serialize } from '@ethersproject/transactions';
 import { toUtf8Bytes } from '@ethersproject/strings';
 import { Bytes, hexlify, joinSignature } from '@ethersproject/bytes';
+import { _TypedDataEncoder } from '@ethersproject/hash';
+
 import { LedgerHQProvider } from './provider';
 import { checkError, convertToUnsigned, toNumber } from './helpers';
 import { UnsignedTransactionStrict } from './types';
@@ -134,7 +145,37 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
     throw new Error('method is not implemented');
   }
 
-  async _signTypedData(): Promise<string> {
-    throw new Error('method is not implemented');
+  async _signTypedData(
+    domain: TypedDataDomain,
+    types: Record<string, Array<TypedDataField>>,
+    value: Record<string, any>,
+  ): Promise<string> {
+    const encoder = new _TypedDataEncoder(types);
+    const data: EIP712Message = {
+      domain: {
+        name: domain.name,
+        verifyingContract: domain.verifyingContract,
+        version: domain.version,
+        chainId: domain.chainId
+          ? parseInt(domain.chainId.toString())
+          : undefined,
+      },
+      types: {
+        ...types,
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+      } as EIP712MessageTypes,
+      primaryType: encoder.primaryType,
+      message: value,
+    };
+    const { r, s, v } = await this.withEthApp((eth) =>
+      eth.signEIP712Message(this.path, data),
+    );
+
+    return joinSignature({ r: '0x' + r, s: '0x' + s, v });
   }
 }
