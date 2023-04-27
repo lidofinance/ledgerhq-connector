@@ -77,17 +77,23 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
     params: Array<unknown>;
   }): Promise<unknown> {
     invariant(this.signer, 'Signer is not defined');
-
-    if (method === 'eth_sendTransaction') {
-      const sourceTx = params[0] as TransactionRequestExtended;
-      const unsignedTx = await convertToUnsigned(sourceTx);
-      const signedTx = await this.signer.signTransaction(unsignedTx);
-
-      return this.send('eth_sendRawTransaction', [signedTx]);
+    switch (method) {
+      case 'eth_sendTransaction':
+        const sourceTx = params[0] as TransactionRequestExtended;
+        const unsignedTx = await convertToUnsigned(sourceTx);
+        const signedTx = await this.signer.signTransaction(unsignedTx);
+        return this.send('eth_sendRawTransaction', [signedTx]);
+      case 'eth_accounts':
+        return [await this.getAddress()];
+      case 'eth_signTypedData_v4':
+        const args = params[1] as any;
+        return await this.signer._signTypedData(
+          args.domain,
+          args.types,
+          args.message,
+        );
+      default:
+        return this.send(method, params);
     }
-
-    if (method === 'eth_accounts') return [await this.getAddress()];
-
-    return this.send(method, params);
   }
 }
