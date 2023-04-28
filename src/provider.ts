@@ -86,12 +86,15 @@ export class LedgerHQProvider extends JsonRpcBatchProvider {
       case 'eth_accounts':
         return [await this.getAddress()];
       case 'eth_signTypedData_v4':
-        const args = params[1] as any;
-        return await this.signer._signTypedData(
-          args.domain,
-          args.types,
-          args.message,
-        );
+        if (typeof params[1] !== 'string')
+          throw new Error('eth_signTypedData_v4 arg 1 is not a string');
+        const payload = JSON.parse(params[1] as string);
+        return await this.signer.__signEIP712Message({
+          domain: payload.domain,
+          types: payload.types,
+          primaryType: payload.primaryType,
+          message: payload.message,
+        });
       default:
         return this.send(method, params);
     }
