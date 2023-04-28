@@ -145,11 +145,14 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
     throw new Error('method is not implemented');
   }
 
+  // _signTypedData as per ethers Signer, cleans up types, replaces domain, calculates primaryType
   async _signTypedData(
     domain: TypedDataDomain,
-    types: Record<string, Array<TypedDataField>>,
+    _types: Record<string, Array<TypedDataField>>,
     value: Record<string, any>,
   ): Promise<string> {
+    const types = { ..._types };
+    delete types['EIP712Domain'];
     const encoder = new _TypedDataEncoder(types);
     const data: EIP712Message = {
       domain: {
@@ -172,6 +175,12 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
       primaryType: encoder.primaryType,
       message: value,
     };
+
+    return this.__signEIP712Message(data);
+  }
+
+  // custom method, also called directly on eth_signTypedData_v4 RPC request
+  async __signEIP712Message(data: EIP712Message): Promise<string> {
     const { r, s, v } = await this.withEthApp((eth) =>
       eth.signEIP712Message(this.path, data),
     );
