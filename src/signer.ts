@@ -154,6 +154,7 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
     const types = { ..._types };
     delete types['EIP712Domain'];
     const encoder = new _TypedDataEncoder(types);
+
     const data: EIP712Message = {
       domain: {
         name: domain.name,
@@ -181,9 +182,39 @@ export class LedgerHQSigner extends Signer implements TypedDataSigner {
 
   // custom method, also called directly on eth_signTypedData_v4 RPC request
   async __signEIP712Message(data: EIP712Message): Promise<string> {
-    const { r, s, v } = await this.withEthApp((eth) =>
-      eth.signEIP712Message(this.path, data),
-    );
+    const { r, s, v } = await this.withEthApp(async (eth) => {
+      try {
+        return await eth.signEIP712Message(this.path, data);
+      } catch (e) {
+        console.warn('error in __signEIP712Message, trying fallback', e);
+        if (
+          e &&
+          typeof e == 'object' &&
+          'statusCode' in e &&
+          // UNKNOWN_APDU status code, needs recheck
+          e.statusCode == 0x6d02
+        ) {
+          const _types: Record<string, TypedDataField[]> = {
+            ...data.types,
+          };
+          delete _types['EIP712Domain'];
+          const encoder = new _TypedDataEncoder(_types);
+
+          const domainSeparatorHex = _TypedDataEncoder.hashDomain(data.domain);
+
+          const hashStructMessageHex = encoder.hashStruct(
+            data.primaryType,
+            data.message,
+          );
+          return await eth.signEIP712HashedMessage(
+            this.path,
+            domainSeparatorHex,
+            hashStructMessageHex,
+          );
+        }
+        throw e;
+      }
+    });
 
     return joinSignature({ r: '0x' + r, s: '0x' + s, v });
   }
